@@ -1,52 +1,54 @@
-# Prerequisites
-*.d
-
-# Object files
+# Compilação de arquivos de saída
 *.o
-*.ko
+*.out
+*.lo
+*.la
+*.al
 *.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
 *.gch
 *.pch
 
-# Libraries
+# Arquivos de biblioteca
 *.lib
 *.a
 *.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
+*.lai
 *.so
-*.so.*
+*.dll
 *.dylib
-
-# Executables
 *.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
 
-# Debug files
+# Diretórios de build
+/libraries/
+/build/
+/dist/
+/Debug/
+/Release/
+
+# Logs e arquivos de depuração
+*.log
+*.stackdump
+
+# Arquivos de depuração do C++ e CMake
 *.dSYM/
-*.su
-*.idb
-*.pdb
+*.cproject
+*.project
+*.idea/
+*.swp
+*.swo
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# Arquivos de cache de compilação
+CMakeCache.txt
+CMakeFiles/
+
+# Arquivos temporários do sistema
+*.DS_Store
+*.directory
+
+# Configurações de IDE e do sistema
+.vscode/
+.idea/
+*.code-workspace
+
+# Arquivos de backup do editor
+*~
