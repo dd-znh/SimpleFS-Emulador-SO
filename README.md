@@ -1,9 +1,3 @@
----
-
-**Nome do Repositório**: `SimpleFS-Emulador-SO`
-
----
-
 # SimpleFS - Emulador de Sistema de Arquivos
 
 Este projeto implementa um sistema de arquivos emulado chamado **SimpleFS**, baseado na estrutura de inodes dos sistemas Unix. O projeto foi desenvolvido para a disciplina de **Sistemas Operacionais I** na Universidade Federal de Santa Catarina.
