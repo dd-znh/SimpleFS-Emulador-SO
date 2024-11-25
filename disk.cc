@@ -49,6 +49,8 @@ void Disk::read(int blocknum, char *data )
 
     fseek(diskfile, blocknum * DISK_BLOCK_SIZE, SEEK_SET);
 
+	// cout << "Trying to read block " << blocknum << "\n";
+
 	if(fread(data,DISK_BLOCK_SIZE,1,diskfile)==1) {
 		nreads++;
 	} else {

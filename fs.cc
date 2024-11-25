@@ -22,7 +22,7 @@ void INE5412_FS::fs_debug()
 		for(int j=0 ; j < INODES_PER_BLOCK ; j++) {
 			fs_inode inode = block.inode[j];
 			if(inode.isvalid == 1) {
-				cout << "inode " << i*INODES_PER_BLOCK+j << ":\n";
+				cout << "inode " << i*INODES_PER_BLOCK+j+1 << ":\n";
 				cout << "\tsize: " << inode.size << " bytes\n";
 				cout << "\tdirect blocks:";
 				for(int k=0 ; k < POINTERS_PER_INODE ; k++) {
@@ -42,6 +42,7 @@ void INE5412_FS::fs_debug()
 					}
 					cout << "\n";
 				}
+			disk->read(i+1, block.data);
 			}
 		}
 	}
