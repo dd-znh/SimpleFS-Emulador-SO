@@ -11,18 +11,20 @@ void INE5412_FS::fs_debug()
 
 	disk->read(0, block.data);
 
-	cout << "superblock:\n";
-	cout << "    " << (block.super.magic == FS_MAGIC ? "magic number is valid\n" : "magic number is invalid!\n");
- 	cout << "    " << block.super.nblocks << " blocks on disk\n";
-	cout << "    " << block.super.ninodeblocks << " blocks for inodes\n";
-	cout << "    " << block.super.ninodes << " inodes total\n";
+	fs_superblock superblock = block.super;
 
-	for(int i=0 ; i < block.super.ninodeblocks ; i++) {
-		disk->read(i+1, block.data);
+	cout << "superblock:\n";
+	cout << "    " << (superblock.magic == FS_MAGIC ? "magic number is valid\n" : "magic number is invalid!\n");
+ 	cout << "    " << superblock.nblocks << " blocks on disk\n";
+	cout << "    " << superblock.ninodeblocks << " blocks for inodes\n";
+	cout << "    " << superblock.ninodes << " inodes total\n";	
+
+	for(int i=1 ; i < superblock.ninodeblocks +1; i++) {
+		disk->read(i, &block.data[0]);
 		for(int j=0 ; j < INODES_PER_BLOCK ; j++) {
 			fs_inode inode = block.inode[j];
 			if(inode.isvalid == 1) {
-				cout << "inode " << i*INODES_PER_BLOCK+j+1 << ":\n";
+				cout << "inode " << (i-1)*INODES_PER_BLOCK+j+1 << ":\n";
 				cout << "\tsize: " << inode.size << " bytes\n";
 				cout << "\tdirect blocks:";
 				for(int k=0 ; k < POINTERS_PER_INODE ; k++) {
@@ -42,7 +44,7 @@ void INE5412_FS::fs_debug()
 					}
 					cout << "\n";
 				}
-			disk->read(i+1, block.data);
+			disk->read(i, block.data);
 			}
 		}
 	}
