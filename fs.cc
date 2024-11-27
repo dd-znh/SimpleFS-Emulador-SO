@@ -20,7 +20,7 @@ void INE5412_FS::fs_debug()
 	cout << "    " << superblock.ninodes << " inodes total\n";	
 
 	for(int i=1 ; i < superblock.ninodeblocks +1; i++) {
-		disk->read(i, &block.data[0]);
+		disk->read(i+1, block.data);
 		for(int j=0 ; j < INODES_PER_BLOCK ; j++) {
 			fs_inode inode = block.inode[j];
 			if(inode.isvalid == 1) {
@@ -43,8 +43,8 @@ void INE5412_FS::fs_debug()
 						}
 					}
 					cout << "\n";
+					disk->read(i, block.data);
 				}
-			disk->read(i, block.data);
 			}
 		}
 	}
