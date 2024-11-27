@@ -6,24 +6,26 @@ int INE5412_FS::fs_format()
 
 	disk->read(0, block.data);
 
+	class fs_superblock superblock = block.super;
+
+	// Disco já formatado ou montado, retorna 0
 	if (block.super.magic == FS_MAGIC) {
-		return 1;
+		return 0; // Erro de formatação
 	}
 
-	block.super.magic = FS_MAGIC; // Setta o magic number no superbloco
-	block.super.nblocks = disk->size(); // Número total de blocos, antes de ler os blocos usados, supõe todos os blocos do disco
-	block.super.ninodeblocks = block.super.nblocks / 10 + (block.super.nblocks % 10 != 0); // 10% dos blocos, arredondando pra cima
-	block.super.ninodes = block.super.ninodeblocks * INODES_PER_BLOCK; // Número total de inodes
+	superblock.magic = FS_MAGIC; // Setta o magic number no superbloco
+	superblock.nblocks = disk->size(); // Número total de blocos no disco
+	superblock.ninodeblocks = superblock.nblocks / 10 + (superblock.nblocks % 10 != 0); // 10% dos blocos, arredondando pra cima
+	superblock.ninodes = superblock.ninodeblocks * INODES_PER_BLOCK; // Número total de inodes
 
 	// Apagar tabelas de inodes
 	for(int i=1 ; i < block.super.ninodeblocks + 1; i++) {
+		disk->read(i, block.data);
 		for(int j=0 ; j < INODES_PER_BLOCK ; j++) {
 			block.inode[j].isvalid = 0;
 		}
-		disk->write(i, block.data);
 	}
-
-	return 0;
+	return 1; // Formatação bem sucedida
 }
 
 void INE5412_FS::fs_debug()
