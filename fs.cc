@@ -48,39 +48,33 @@ void INE5412_FS::fs_debug()
 	cout << "    " << (superblock.magic == FS_MAGIC ? "magic number is valid\n" : "magic number is invalid!\n");
  	cout << "    " << superblock.nblocks << " blocks on disk\n";
 	cout << "    " << superblock.ninodeblocks << " blocks for inodes\n";
-	cout << "    " << superblock.ninodes << " inodes total\n";	
+	cout << "    " << superblock.ninodes << " inodes total\n";
 
-	// Iterar sobre os blocos de inodes
-	for(int i=1 ; i < superblock.ninodeblocks +1; i++) {
-		disk->read(i+1, block.data); // Lê cada bloco de inode
-		// Iterar sobre os inodes do bloco
-		for(int j=0 ; j < INODES_PER_BLOCK ; j++) {
-			fs_inode inode = block.inode[j]; 
-			// Para cada inode, se ele for válido, imprime seus blocos diretos
-			if(inode.isvalid == 1) {
-				cout << "inode " << (i-1)*INODES_PER_BLOCK+j+1 << ":\n";
-				cout << "\tsize: " << inode.size << " bytes\n";
-				cout << "\tdirect blocks:";
-				for(int k=0 ; k < POINTERS_PER_INODE ; k++) {
-					if(inode.direct[k] != 0) {
-						cout << " " << inode.direct[k];
+	fs_inode *inode;
+
+	// Iterar sobre todos os inodes
+	for (int i=1 ; i < superblock.ninodes ; i++){
+		inode_load(i, inode); // Carrega o inode
+		if(inode->isvalid != 0){
+			cout << "inode " << i << ":\n";
+			cout << "    size: " << inode->size << " bytes\n";
+			cout << "    direct blocks:";
+			for(int j=0 ; j < POINTERS_PER_INODE ; j++) {
+				if(inode->direct[j] != 0) {
+					cout << " " << inode->direct[j];
+				}
+			}
+			cout << "\n";
+			if(inode->indirect != 0) {
+				cout << "    indirect block: " << inode->indirect << "\n";
+				disk->read(inode->indirect, block.data); // Lê o bloco indireto
+				cout << "    indirect data blocks:";
+				for(int j=0 ; j < POINTERS_PER_BLOCK ; j++) {
+					if(block.pointers[j] != 0) {
+						cout << " " << block.pointers[j];
 					}
 				}
-				// Se houver bloco indireto, acessa o blocos indireto e imprime os blocos de dados para os quais ele aponta
 				cout << "\n";
-				if(inode.indirect != 0) {
-					cout << "\tindirect block: " << inode.indirect << "\n";
-					disk->read(inode.indirect, block.data); // Lê o bloco indireto
-					cout << "\tindirect data blocks:";
-					// Itera sobre os blocos de dados para os quais o bloco indireto aponta
-					for(int k=0 ; k < POINTERS_PER_BLOCK ; k++) {
-						if(block.pointers[k] != 0) {
-							cout << " " << block.pointers[k];
-						}
-					}
-					cout << "\n";
-					disk->read(i, block.data); // Por fim, restaura o bloco de inodes para encontrar o próximo inode
-				}
 			}
 		}
 	}
@@ -156,40 +150,40 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 	return 0;
 }
 
-// int INE5412_FS::inode_load(int inumber, fs_inode *inode)
-// {
-// 	if (inumber < 1) {
-// 		return 0;
-// 	}
-// 	inumber = inumber - 1; // Ajusta o inumber para a indexação começar em 0
-// 	union fs_block block;
-// 	int blocknum = 1 + inumber / INODES_PER_BLOCK; // Acha o bloco de inode ao qual o inode buscado pertence
-// 	int inode_index = inumber % INODES_PER_BLOCK; // Acha o índice do inode no bloco de inode
+int INE5412_FS::inode_load(int inumber, fs_inode *inode)
+{
+	if (inumber < 1 || inumber > disk->size() * INODES_PER_BLOCK) {) {
+		return 0;
+	}
+	inumber = inumber - 1; // Ajusta o inumber para a indexação começar em 0
+	union fs_block block;
+	int blocknum = 1 + inumber / INODES_PER_BLOCK; // Acha o bloco de inode ao qual o inode buscado pertence
+	int inode_index = inumber % INODES_PER_BLOCK; // Acha o índice do inode no bloco de inode
 
-// 	cout << "blocknum: " << blocknum << " inode_index: " << inode_index << endl;
+	cout << "blocknum: " << blocknum << " inode_index: " << inode_index << endl;
 
-// 	disk->read(blocknum, block.data); // Lê o bloco de inode
+	disk->read(blocknum, block.data); // Lê o bloco de inode
 
-// 	*inode = block.inode[inode_index]; // Copia o endereço do inode para o ponteiro passado como argumento
+	*inode = block.inode[inode_index]; // Copia o endereço do inode para o ponteiro passado como argumento
 
-// 	return 1;
-// }
+	return 1;
+}
 
-// int INE5412_FS::inode_save(int inumber, fs_inode *inode)
-// {
-// 	if (inumber < 1) {
-// 		return 0;
-// 	}
-// 	inumber = inumber - 1; // Ajusta o inumber para a indexação começar em 0
-// 	union fs_block block; 
-// 	int blocknum = 1 + inumber / INODES_PER_BLOCK; // Acha o bloco de inode ao qual o inode buscado pertence
-// 	int inode_index = inumber % INODES_PER_BLOCK; // Acha o índice do inode no bloco de inode
+int INE5412_FS::inode_save(int inumber, fs_inode *inode)
+{
+	if (inumber < 1 || inumber > disk->size() / 10 * INODES_PER_BLOCK) {
+		return 0;
+	}
+	inumber = inumber - 1; // Ajusta o inumber para a indexação começar em 0
+	union fs_block block; 
+	int blocknum = 1 + inumber / INODES_PER_BLOCK; // Acha o bloco de inode ao qual o inode buscado pertence
+	int inode_index = inumber % INODES_PER_BLOCK; // Acha o índice do inode no bloco de inode
 
-// 	disk->read(blocknum, block.data); // Lê o bloco de inode
+	disk->read(blocknum, block.data); // Lê o bloco de inode
 
-// 	block.inode[inode_index] = *inode; // Copia o inode para o bloco de inode
+	block.inode[inode_index] = *inode; // Copia o inode para o bloco de inode
 
-// 	disk->write(blocknum, block.data); // Escreve o bloco de inode no disco
+	disk->write(blocknum, block.data); // Escreve o bloco de inode no disco
 
-// 	return 1;
-// }
+	return 1;
+}
