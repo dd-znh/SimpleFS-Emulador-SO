@@ -152,7 +152,7 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 
 int INE5412_FS::inode_load(int inumber, fs_inode *inode)
 {
-	if (inumber < 1 || inumber > disk->size() * INODES_PER_BLOCK) {) {
+	if (inumber < 1 || inumber > disk->size() * INODES_PER_BLOCK) {
 		return 0;
 	}
 	inumber = inumber - 1; // Ajusta o inumber para a indexação começar em 0
