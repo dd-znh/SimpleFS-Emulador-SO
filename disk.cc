@@ -81,4 +81,3 @@ void Disk::close()
 		diskfile = 0;
 	}
 }
-

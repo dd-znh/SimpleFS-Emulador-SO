@@ -10,6 +10,7 @@ public:
     static const unsigned short int INODES_PER_BLOCK = 128;
     static const unsigned short int POINTERS_PER_INODE = 5;
     static const unsigned short int POINTERS_PER_BLOCK = 1024;
+    vector<int> free_blocks;
 
     class fs_superblock {
         public:
@@ -51,6 +52,9 @@ public:
 
     int  fs_read(int inumber, char *data, int length, int offset);
     int  fs_write(int inumber, const char *data, int length, int offset);
+
+    int inode_load(int inumber, fs_inode *inode);
+    int inode_save(int inumber, fs_inode *inode);
 
 private:
     Disk *disk;
