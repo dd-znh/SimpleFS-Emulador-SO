@@ -15,8 +15,8 @@ int INE5412_FS::fs_format()
 
 	new_block_zero.super.magic = FS_MAGIC; // Setta o magic number no superbloco
 	new_block_zero.super.nblocks = disk->size(); // Número total de blocos no disco
-	new_block_zero.super.ninodeblocks = block.super.nblocks / 10 + (block.super.nblocks % 10 != 0); // 10% dos blocos, arredondando pra cima
-	new_block_zero.super.ninodes = block.super.ninodeblocks * INODES_PER_BLOCK; // Número total de inodes
+	new_block_zero.super.ninodeblocks = disk->size() / 10 + (disk->size() % 10 != 0); // 10% dos blocos, arredondando pra cima
+	new_block_zero.super.ninodes = new_block_zero.super.ninodeblocks * INODES_PER_BLOCK; // Número total de inodes
 
 	int ninodeblocks = new_block_zero.super.ninodeblocks; // Salva o número de blocos de inodes
 
@@ -88,7 +88,46 @@ void INE5412_FS::fs_debug()
 
 int INE5412_FS::fs_mount()
 {
-	return 0;
+	union fs_block block;
+
+	disk->read(0, block.data);
+
+	vector<int> free_blocks(block.super.nblocks, 0); // Inicializa o vetor de blocos livres
+
+	// Disco não formatado, retorna 0
+	if (block.super.magic != FS_MAGIC) {
+		return 0; // Erro de montagem
+	}
+
+	// Iterar sobre os blocos de inodes
+	for(int i=1 ; i < block.super.ninodeblocks + 1; i++) {
+		disk->read(i, block.data); // Lê cada bloco de inode
+		// Itera sobre os inodes do bloco
+		for(int j=0 ; j < INODES_PER_BLOCK ; j++) {
+			fs_inode inode = block.inode[j]; 
+			// Para cada inode, se ele for válido, marca os bits referentes a seus blocos diretos no vetor de blocos livres
+			if(inode.isvalid == 1) {
+				for(int k=0 ; k < POINTERS_PER_INODE ; k++) {
+					if(inode.direct[k] != 0) {
+						free_blocks[inode.direct[k]] = 1; // Marca o bloco de dados como ocupado
+					}
+				}
+				// Se houver bloco indireto, acessa o blocos indiretos e  marca os índices
+				// dos blocos de dados para os quais ele aponta como 1 no vetor de blocos livres
+				if(inode.indirect != 0) {
+					disk->read(inode.indirect, block.data); // Lê o bloco indireto
+					// Itera sobre os blocos de dados para os quais o bloco indireto aponta
+					for(int k=0 ; k < POINTERS_PER_BLOCK ; k++) {
+						if(block.pointers[k] != 0) {
+							free_blocks[block.pointers[k]] = 1; // Marca o bloco de dados como ocupado
+						}
+					}
+					disk->read(i, block.data); // Por fim, restaura o bloco de inodes para encontrar o próximo inode
+				}
+			}
+		}
+	}
+	return 1; // Montagem bem sucedida
 }
 
 int INE5412_FS::fs_create()
