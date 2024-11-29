@@ -17,20 +17,18 @@ int INE5412_FS::fs_format() {
     new_block_zero.super.ninodeblocks = disk->size() / 10 + (disk->size() % 10 != 0);     // 10% dos blocos, arredondando pra cima
     new_block_zero.super.ninodes = new_block_zero.super.ninodeblocks * INODES_PER_BLOCK;  // Número total de inodes
 
-    int ninodeblocks = new_block_zero.super.ninodeblocks;  // Salva o número de blocos de inodes
+    int ninodes = new_block_zero.super.ninodes;  // Salva o número de blocos de inodes
 
     disk->write(0, new_block_zero.data);  // Escreve o novo bloco zero no disco
 
-    // Apagar tabelas de inodes
-    for (int i = 1; i < ninodeblocks + 1; i++) {
-        union fs_block new_inode_block;  // Cria um bloco de inodes vazio
+	fs_inode inode;
 
-        // Invalida todos os inodes do bloco
-        for (int j = 0; j < INODES_PER_BLOCK; j++) {
-            new_inode_block.inode[j].isvalid = 0;
-        }
-        disk->write(i, new_inode_block.data);  // Escreve o bloco de inodes vazio no disco
-    }
+    // Apagar tabelas de inodes
+	for (int i = 1; i <= ninodes; i++) {
+        inode_load(i, inode);  // Carrega o inode
+		inode.isvalid = 0;     // Invalida o inode
+		inode_save(i, inode);  // Salva o inode
+	}
     return 1;  // Formatação bem sucedida
 }
 
@@ -90,39 +88,35 @@ int INE5412_FS::fs_mount() {
         return 0;  // Erro de montagem
     }
 
-    // Iterar sobre os blocos de inodes
-    for (int i = 1; i < block.super.ninodeblocks + 1; i++) {
-        disk->read(i, block.data);  // Lê cada bloco de inode
-        // Itera sobre os inodes do bloco
-        for (int j = 0; j < INODES_PER_BLOCK; j++) {
-            fs_inode inode = block.inode[j];
-            // Para cada inode, se ele for válido, marca os bits referentes a seus blocos diretos no vetor de blocos livres
-            if (inode.isvalid == 1) {
-                for (int k = 0; k < POINTERS_PER_INODE; k++) {
-                    if (inode.direct[k] != 0) {
-                        free_blocks[inode.direct[k]] = 1;  // Marca o bloco de dados como ocupado
-                    }
-                }
-                // Se houver bloco indireto, acessa o blocos indiretos e  marca os índices
-                // dos blocos de dados para os quais ele aponta como 1 no vetor de blocos livres
-                if (inode.indirect != 0) {
-                    disk->read(inode.indirect, block.data);  // Lê o bloco indireto
-                    // Itera sobre os blocos de dados para os quais o bloco indireto aponta
-                    for (int k = 0; k < POINTERS_PER_BLOCK; k++) {
-                        if (block.pointers[k] != 0) {
-                            free_blocks[block.pointers[k]] = 1;  // Marca o bloco de dados como ocupado
-                        }
-                    }
-                    disk->read(i, block.data);  // Por fim, restaura o bloco de inodes para encontrar o próximo inode
-                }
-            }
-        }
-    }
+	fs_inode inode;
+	// Iterar sobre todos os inodes
+	for (int i = 1; i <= block.super.ninodes; i++) {
+		inode_load(i, inode);  // Carrega o inode
+		 // Para cada inode, se ele for válido, marca os bits referentes a seus blocos diretos no vetor de blocos livres
+		if (inode.isvalid == 1) {
+			for (int j = 0; j < POINTERS_PER_INODE; j++) {
+				if (inode.direct[j] != 0) {
+					free_blocks[inode.direct[j]] = 1;  // Marca o bloco de dados direto como ocupado
+				}
+			}
+			// Se houver bloco indireto, acessa os blocos indiretos e  marca os índices
+			// dos blocos de dados para os quais ele aponta como 1 no vetor de blocos livres
+			if (inode.indirect != 0) {
+				disk->read(inode.indirect, block.data);  // Lê o bloco indireto
+				// Itera sobre os blocos de dados para os quais o bloco indireto aponta
+				for (int j = 0; j < POINTERS_PER_BLOCK; j++) {
+					if (block.pointers[j] != 0) {
+						free_blocks[block.pointers[j]] = 1;  // Marca o bloco de dados indireto como ocupado
+					}
+				}
+			}
+		}
+	}
     return 1;  // Montagem bem sucedida
 }
 
 int INE5412_FS::fs_create() {
-    return 0;
+	return 0;
 }
 
 int INE5412_FS::fs_delete(int inumber) {

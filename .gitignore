@@ -52,3 +52,6 @@ CMakeFiles/
 
 # Arquivos de backup do editor
 *~
+
+# Arquivos criados de disco locais
+mydisk*
