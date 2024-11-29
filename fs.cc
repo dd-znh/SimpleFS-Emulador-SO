@@ -52,7 +52,7 @@ void INE5412_FS::fs_debug() {
 
     // Iterar sobre todos os inodes
     for (int i = 1; i <= superblock.ninodes; i++) {
-        inode_load(i, &inode);  // Carrega o inode
+        inode_load(i, inode);  // Carrega o inode
         if (inode.isvalid != 0) {
             cout << "inode " << i << ":\n";
             cout << "    size: " << inode.size << " bytes\n";
@@ -141,7 +141,7 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
     return 0;
 }
 
-int INE5412_FS::inode_load(int inumber, fs_inode *inode) {
+int INE5412_FS::inode_load(int inumber, fs_inode &inode) {
     if (inumber < 1 || inumber > disk->size() * INODES_PER_BLOCK) {
         return 0;
     }
@@ -150,16 +150,14 @@ int INE5412_FS::inode_load(int inumber, fs_inode *inode) {
     int blocknum = 1 + inumber / INODES_PER_BLOCK;  // Acha o bloco de inode ao qual o inode buscado pertence
     int inode_index = inumber % INODES_PER_BLOCK;   // Acha o índice do inode no bloco de inode
 
-    // cout << "blocknum: " << blocknum << " inode_index: " << inode_index << endl;
-
     disk->read(blocknum, block.data);  // Lê o bloco de inode
 
-    inode = &block.inode[inode_index];  // Copia o endereço do inode para o ponteiro passado como argumento
+    inode = block.inode[inode_index];  // Copia o endereço do inode para o ponteiro passado como argumento
 
     return 1;
 }
 
-int INE5412_FS::inode_save(int inumber, fs_inode *inode) {
+int INE5412_FS::inode_save(int inumber, fs_inode &inode) {
     if (inumber < 1 || inumber > disk->size() / 10 * INODES_PER_BLOCK) {
         return 0;
     }
@@ -170,7 +168,7 @@ int INE5412_FS::inode_save(int inumber, fs_inode *inode) {
 
     disk->read(blocknum, block.data);  // Lê o bloco de inode
 
-    block.inode[inode_index] = *inode;  // Copia o inode para o bloco de inode
+    block.inode[inode_index] = inode;  // Copia o inode para o bloco de inode
 
     disk->write(blocknum, block.data);  // Escreve o bloco de inode no disco
 
