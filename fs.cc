@@ -170,7 +170,7 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset)
 
 // 	disk->read(blocknum, block.data); // Lê o bloco de inode
 
-// 	*inode = block.inode[inode_index]; // Copia o endereço do inode para o ponteiro passado como argumento
+//*inode = &block.inode[inode_index]; // Copia o endereço do inode para o ponteiro passado como argumento
 
 // 	return 1;
 // }
