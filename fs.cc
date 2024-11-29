@@ -116,14 +116,55 @@ int INE5412_FS::fs_mount() {
 }
 
 int INE5412_FS::fs_create() {
+	// Iterar sobre todos os inodes, até encontrar um inode inválido
+	fs_inode inode;
+	for (int i = 1 ; i < (disk->size() / 10 + (disk->size() % 10 != 0)) ; i++) {
+		inode_load(i, inode);  // Carrega o inode
+		if (inode.isvalid == 0) {
+			inode.isvalid = 1;  // Marca o inode como válido
+			inode.size = 0;      // Zera o tamanho do arquivo
+			for (int j = 0; j < POINTERS_PER_INODE; j++) {
+				inode.direct[j] = 0;  // Zera os ponteiros diretos
+			}
+			inode.indirect = 0;  // Zera o ponteiro indireto
+			inode_save(i, inode);  // Salva o inode
+			return i;  // Retorna o número do inode criado
+		}
+	}
 	return 0;
 }
 
-int INE5412_FS::fs_delete(int inumber) {
+int INE5412_FS::fs_delete(int inumber) { //Está implementado ignorando o reset de tamanho e ponteiros, visto que marcar como invalid é suficiente
+	fs_inode inode;
+	if (inode_load(inumber, inode) == 1) {
+		inode.isvalid = 0;  // Invalida o inode
+		//inode.size = 0;      // Zera o tamanho do arquivo
+		for (int j = 0; j < POINTERS_PER_INODE; j++) {
+			if (inode.direct[j] != 0) {
+				free_blocks[inode.direct[j]] = 0;  // Marca o bloco de dados direto como livre
+				//inode.direct[j] = 0;  // Zera os ponteiros diretos
+			}
+		}
+		if (inode.indirect != 0) {
+			union fs_block block;
+			disk->read(inode.indirect, block.data);  // Lê o bloco indireto
+			for (int j = 0; j < POINTERS_PER_BLOCK; j++) {
+				if (block.pointers[j] != 0) {
+					free_blocks[block.pointers[j]] = 0;  // Marca o bloco de dados indireto como livre
+				}
+			}
+			free_blocks[inode.indirect] = 0;  // Marca o bloco indireto como livre
+			//inode.indirect = 0;  // Zera o ponteiro indireto
+		}
+	}
     return 0;
 }
 
 int INE5412_FS::fs_getsize(int inumber) {
+	fs_inode inode;
+	if (inode_load(inumber, inode) == 1) {
+		return inode.size;
+	}
     return -1;
 }
 
