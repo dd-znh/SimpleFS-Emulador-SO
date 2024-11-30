@@ -169,11 +169,126 @@ int INE5412_FS::fs_getsize(int inumber) {
 }
 
 int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
-    return 0;
+    fs_inode inode;
+    // Carrega o inode, e retorna 0 se o inumber for inválido
+    if (inode_load(inumber, inode) == 0) {
+        return 0;
+    }
+    // Retorna 0 se o offset for maior ou igual ao tamanho do arquivo
+    if (offset >= inode.size) {
+        return 0;
+    }
+    // Ajusta o tamanho da leitura para não ultrapassar o tamanho do arquivo
+    if (offset + length > inode.size) {
+        length = inode.size - offset;
+    }
+
+    vector<char> buffer; // Inicializa um buffer para armazenar os dados lidos
+    int read = 0; // Contador de dados lidos
+    int blocknum = offset / Disk::DISK_BLOCK_SIZE; // Número do bloco de dados do inode a ser lido
+    int blockoff = offset % Disk::DISK_BLOCK_SIZE; // Offset dentro do bloco de dados do inode a ser lido
+    union fs_block block;
+    // Enquanto não leu todos os dados requisitados
+    while (read < length) {
+        if (blocknum < POINTERS_PER_INODE) { // Itera sobre os ponteiros diretos
+            if (inode.direct[blocknum] == 0) { // Se não houver bloco de dados, retorna
+                break;
+            }
+            disk->read(inode.direct[blocknum], block.data); // Lê o bloco de dados direto
+        } 
+        else {
+            if (inode.indirect == 0) { // Se não houver bloco indireto, retorna
+                break;
+            }
+            disk->read(inode.indirect, block.data); // Lê o bloco indireto
+            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data); // Lê o bloco de dados indireto
+        }
+
+        int toread = min(length - read, Disk::DISK_BLOCK_SIZE - blockoff); // Calcula quantos dados ainda precisam ser lidos
+
+        // Copia os dados lidos para o buffer
+        buffer.insert(buffer.end(), block.data + blockoff, block.data + blockoff + toread);
+        // Atualiza os contadores
+        read += Disk::DISK_BLOCK_SIZE - blockoff;
+        blockoff = 0;
+        blocknum++;
+    }
+    copy(buffer.begin(), buffer.end(), data); // Copia os dados do buffer para o ponteiro passado como argumento
+    return read; // Retorna o número de dados lidos
 }
 
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) {
-    return 0;
+    fs_inode inode;
+    // Carrega o inode, e retorna 0 se o inumber for inválido
+    if (inode_load(inumber, inode) == 0) {
+        return 0;
+    }
+    // Retorna 0 se o offset for maior que o tamanho do arquivo
+    if (offset > inode.size) {
+        return 0;
+    }
+    // Ajusta o tamanho da escrita para não ultrapassar o tamanho do arquivo
+    if (offset + length > inode.size) {
+        length = inode.size - offset;
+    }
+
+    int written = 0; // Contador de dados escritos
+    int blocknum = offset / Disk::DISK_BLOCK_SIZE; // Número do bloco de dados do inode a ser escrito
+    int blockoff = offset % Disk::DISK_BLOCK_SIZE; // Offset dentro do bloco de dados do inode a ser escrito
+    union fs_block block;
+    // Enquanto não escreveu todos os dados requisitados
+    while (written < length) {
+        if (blocknum < POINTERS_PER_INODE) { // Itera sobre os ponteiros diretos
+            if (inode.direct[blocknum] == 0) { // Se não houver bloco de dados, aloca um novo bloco
+                for (int i = 1; i < disk->size(); i++) {
+                    if (free_blocks[i] == 0) {
+                        free_blocks[i] = 1; // Marca o bloco de dados como ocupado
+                        inode.direct[blocknum] = i; // Atualiza o ponteiro direto
+                        break;
+                    }
+                }
+            }
+            disk->read(inode.direct[blocknum], block.data); // Lê o bloco de dados direto
+            // Escreve os dados no bloco de dados direto
+            int towrite = min(length - written, Disk::DISK_BLOCK_SIZE - blockoff); // Calcula quantos dados ainda precisam ser escritos
+            copy(data + written, data + written + towrite, block.data + blockoff); // Copia os dados para o bloco de dados
+            disk->write(inode.direct[blocknum], block.data); // Escreve o bloco de dados direto no disco
+        } 
+        else {
+            if (inode.indirect == 0) { // Se não houver bloco indireto, aloca um novo bloco
+                for (int i = 1; i < disk->size(); i++) {
+                    if (free_blocks[i] == 0) {
+                        free_blocks[i] = 1; // Marca o bloco de dados como ocupado
+                        inode.indirect = i; // Atualiza o ponteiro indireto
+                        break;
+                    }
+                }
+            }
+            disk->read(inode.indirect, block.data); // Lê o bloco indireto
+            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) { // Se não houver bloco de dados, aloca um novo bloco
+                for (int i = 1; i < disk->size(); i++) {
+                    if (free_blocks[i] == 0) {
+                        free_blocks[i] = 1; // Marca o bloco de dados como ocupado
+                        block.pointers[blocknum - POINTERS_PER_INODE] = i; // Atualiza o ponteiro indireto
+                        break;
+                    }
+                }
+            }
+            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data); // Lê o bloco de dados indireto
+            // Escreve os dados no bloco de dados indireto
+            int towrite = min(length - written, Disk::DISK_BLOCK_SIZE - blockoff); // Calcula quantos dados ainda precisam ser escritos
+            copy(data + written, data + written + towrite, block.data + blockoff); // Copia os dados para o bloco de dados
+            disk->write(block.pointers[blocknum - POINTERS_PER_INODE], block.data); // Escreve o bloco de dados indireto no disco
+        }
+        // Atualiza os contadores
+        written += Disk::DISK_BLOCK_SIZE - blockoff;
+        blockoff = 0;
+        blocknum++;
+    }
+    // Atualiza o tamanho do arquivo
+    inode.size = inode.size + written;
+    inode_save(inumber, inode); // Salva o inode
+    return written; // Retorna o número de dados escritos
 }
 
 int INE5412_FS::inode_load(int inumber, fs_inode &inode) {
