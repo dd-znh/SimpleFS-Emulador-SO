@@ -148,6 +148,25 @@ int main( int argc, char *argv[] )
 				cout << "use: copyout <inumber> <filename>\n";
 			}
 
+// ------------------- TEST -----------------------
+		} else if(!strcmp(cmd, "test")) {
+			if(args == 3) {
+				inumber = atoi(arg1);
+				int length = atoi(arg2);
+				int offset = 0;
+				char *data = new char[length];
+				int result = fs.fs_read(inumber, data, length, offset);
+				delete [] data;
+				if(result != 0) {
+					cout << "READ inode " << inumber << " for " << result << " bytes\n";
+				} else {
+					cout << "READ failed!\n";
+				}
+			} else {
+				cout << "use: fs_read <inumber> <length> (offset hardset = 0)\n";
+			}
+// ------------------------------------------------
+
 		} else if(!strcmp(cmd, "help")) {
 			cout << "Commands are:\n";
 			cout << "    format\n";

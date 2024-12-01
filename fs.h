@@ -55,6 +55,7 @@ public:
 
     int inode_load(int inumber, fs_inode &inode);
     int inode_save(int inumber, fs_inode &inode);
+    int find_free_block();
 
 private:
     Disk *disk;
