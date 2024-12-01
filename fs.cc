@@ -134,15 +134,15 @@ int INE5412_FS::fs_create() {
 	return 0;
 }
 
-int INE5412_FS::fs_delete(int inumber) { //Está implementado ignorando o reset de tamanho e ponteiros, visto que marcar como invalid é suficiente
+int INE5412_FS::fs_delete(int inumber) { 
 	fs_inode inode;
 	if (inode_load(inumber, inode) == 1) {
 		inode.isvalid = 0;  // Invalida o inode
-		//inode.size = 0;      // Zera o tamanho do arquivo
+		inode.size = 0;      // Zera o tamanho do arquivo
 		for (int j = 0; j < POINTERS_PER_INODE; j++) {
 			if (inode.direct[j] != 0) {
 				free_blocks[inode.direct[j]] = 0;  // Marca o bloco de dados direto como livre
-				//inode.direct[j] = 0;  // Zera os ponteiros diretos
+				inode.direct[j] = 0;  // Zera os ponteiros diretos
 			}
 		}
 		if (inode.indirect != 0) {
@@ -154,8 +154,11 @@ int INE5412_FS::fs_delete(int inumber) { //Está implementado ignorando o reset 
 				}
 			}
 			free_blocks[inode.indirect] = 0;  // Marca o bloco indireto como livre
-			//inode.indirect = 0;  // Zera o ponteiro indireto
+			inode.indirect = 0;  // Zera o ponteiro indireto
 		}
+        if (inode_save(inumber, inode) == 1) {
+            return 1;
+        }
 	}
     return 0;
 }
