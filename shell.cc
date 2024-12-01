@@ -155,15 +155,31 @@ int main( int argc, char *argv[] )
 				int length = atoi(arg2);
 				int offset = 0;
 				char *data = new char[length];
-				int result = fs.fs_read(inumber, data, length, offset);
+				for(int i = 0; i < length; i++) {
+					data[i] = 'a' + (i % 26);
+				}
+				int result = fs.fs_write(inumber, data, length, offset);
 				delete [] data;
 				if(result != 0) {
-					cout << "READ inode " << inumber << " for " << result << " bytes\n";
+					cout << "WROTE inode " << inumber << " for " << result << " bytes\n";
+					// Show the data written, loading it from the inode
+					char *data = new char[length];
+					result = fs.fs_read(inumber, data, length, offset);
+					if(result != 0) {
+						cout << "READ inode " << inumber << " for " << result << " bytes\n";
+						for(int i = 0; i < length; i++) {
+							cout << data[i];
+						}
+						cout << "\n";
+						delete [] data;
+					} else {
+						cout << "READ failed!\n";
+					}
 				} else {
-					cout << "READ failed!\n";
+					cout << "WRITE failed!\n";
 				}
 			} else {
-				cout << "use: fs_read <inumber> <length> (offset hardset = 0)\n";
+				cout << "use: fs_write <inumber> <length> (offset hardset = 0)\n";
 			}
 // ------------------------------------------------
 

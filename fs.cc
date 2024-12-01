@@ -234,10 +234,6 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
     if (offset > inode.size) {
         return 0;
     }
-    // Ajusta o tamanho da escrita
-    if (offset + length > inode.size) {
-        length = inode.size - offset;
-    }
 
     int written = 0;
     int blocknum = offset / Disk::DISK_BLOCK_SIZE;
@@ -247,34 +243,55 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
     while (written < length) {
         int towrite = std::min(length - written, Disk::DISK_BLOCK_SIZE - blockoff);
 
-        if (blocknum < POINTERS_PER_INODE) {
+        if (blocknum < POINTERS_PER_INODE) { // Direct pointers
             if (inode.direct[blocknum] == 0) {
                 int free_block = find_free_block();
-                if (free_block == -1) return written; // Sem blocos livres
+                if (free_block == -1) {
+                    return written; // No free blocks available
+                }
                 inode.direct[blocknum] = free_block;
             }
             disk->read(inode.direct[blocknum], block.data);
-        } else {
+        } 
+        else { // Indirect pointers
+            int indirect_index = blocknum - POINTERS_PER_INODE;
+
+            if (indirect_index >= POINTERS_PER_BLOCK) {
+                break; // Exceeds maximum file size
+            }
+
             if (inode.indirect == 0) {
                 int free_block = find_free_block();
-                if (free_block == -1) return written; // Sem blocos livres
+                if (free_block == -1) {
+                    return written; // No free blocks available
+                }
                 inode.indirect = free_block;
-            }
-            disk->read(inode.indirect, block.data);
-            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) {
-                int free_block = find_free_block();
-                if (free_block == -1) return written; // Sem blocos livres
-                block.pointers[blocknum - POINTERS_PER_INODE] = free_block;
+                std::fill(std::begin(block.pointers), std::end(block.pointers), 0); // Initialize pointers
                 disk->write(inode.indirect, block.data);
             }
-            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data);
+
+            disk->read(inode.indirect, block.data);
+
+            if (block.pointers[indirect_index] == 0) {
+                int free_block = find_free_block();
+                if (free_block == -1) {
+                    return written; // No free blocks available
+                }
+                block.pointers[indirect_index] = free_block;
+                disk->write(inode.indirect, block.data);
+            }
+
+            disk->read(block.pointers[indirect_index], block.data);
         }
 
+        // Write data to block
         std::copy(data + written, data + written + towrite, block.data + blockoff);
+
         if (blocknum < POINTERS_PER_INODE) {
             disk->write(inode.direct[blocknum], block.data);
         } else {
-            disk->write(block.pointers[blocknum - POINTERS_PER_INODE], block.data);
+            int indirect_index = blocknum - POINTERS_PER_INODE;
+            disk->write(block.pointers[indirect_index], block.data);
         }
 
         written += towrite;
@@ -282,7 +299,11 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
         blocknum++;
     }
 
-    inode.size = std::max(inode.size, offset + written);
+    // Update file size if necessary
+    if (offset + written > inode.size) {
+        inode.size = offset + written;
+    }
+
     inode_save(inumber, inode);
     return written;
 }
