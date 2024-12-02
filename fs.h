@@ -11,6 +11,7 @@ public:
     static const unsigned short int POINTERS_PER_INODE = 5;
     static const unsigned short int POINTERS_PER_BLOCK = 1024;
     vector<int> free_blocks;
+    bool mounted;
 
     class fs_superblock {
         public:
@@ -40,6 +41,7 @@ public:
 
     INE5412_FS(Disk *d) {
         disk = d;
+        mounted = false;
     } 
 
     void fs_debug();

@@ -1,7 +1,6 @@
 #include "fs.h"
 
 int INE5412_FS::fs_format() {
-
     // Lê o bloco 0 para verificar se o disco já está formatado
     union fs_block block;
     disk->read(0, block.data);
@@ -29,8 +28,8 @@ int INE5412_FS::fs_format() {
 
     // Apagar tabelas de inodes
     for (int i = 1; i <= new_block_zero.super.ninodes; i++) {
-        inode_load(i, inode); 
-        inode.isvalid = 0;  
+        inode_load(i, inode);
+        inode.isvalid = 0;
         inode_save(i, inode);
     }
 
@@ -38,7 +37,6 @@ int INE5412_FS::fs_format() {
 }
 
 void INE5412_FS::fs_debug() {
-
     // Lê o superbloco
     union fs_block block;
     disk->read(0, block.data);
@@ -55,7 +53,6 @@ void INE5412_FS::fs_debug() {
 
     // Iterar sobre todos os inodes
     for (int i = 1; i <= superblock.ninodes; i++) {
-
         // Carrega o inode
         inode_load(i, inode);
 
@@ -91,7 +88,6 @@ void INE5412_FS::fs_debug() {
 }
 
 int INE5412_FS::fs_mount() {
-
     // Lê o superbloco
     union fs_block block;
     disk->read(0, block.data);
@@ -130,12 +126,12 @@ int INE5412_FS::fs_mount() {
             }
         }
     }
+    mounted = true;
 
     return 1;
 }
 
 int INE5412_FS::fs_create() {
-
     // Carrega o superbloco
     fs_inode inode;
     union fs_block block;
@@ -157,9 +153,13 @@ int INE5412_FS::fs_create() {
     return 0;
 }
 
-
 int INE5412_FS::fs_delete(int inumber) {
     fs_inode inode;
+
+    if (!mounted) {
+        cout << "Mount before file operations!" << endl;
+        return 0;
+    }
 
     // Carrega o inode e retorna 0 se o número do inode for inválido
     if (inode_load(inumber, inode) && inode.isvalid) {
@@ -190,14 +190,12 @@ int INE5412_FS::fs_delete(int inumber) {
     return 0;
 }
 
-
 int INE5412_FS::fs_getsize(int inumber) {
-    
     // Carrega o inode e retorna -1 se o número do inode for inválido
-	fs_inode inode;
-	if (inode_load(inumber, inode) == 1) {
-		return inode.size;
-	}
+    fs_inode inode;
+    if (inode_load(inumber, inode) == 1) {
+        return inode.size;
+    }
     return -1;
 }
 
@@ -210,33 +208,37 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
     }
     // Retorna 0 se o offset for maior ou igual ao tamanho do arquivo
     if (offset >= inode.size) {
-        cout << "offset >= inode.size\n";
+        // cout << "offset >= inode.size\n";
         return 0;
     }
 
-    int read = 0; // Contador para a quantidade de dados lidos
-    int blocknum = offset / Disk::DISK_BLOCK_SIZE; // Número do bloco inicial
-    int blockoff = offset % Disk::DISK_BLOCK_SIZE; // Offset dentro do bloco inicial
+    if (offset + length > inode.size) {
+        length = inode.size - offset;
+    }
+
+    int read = 0;                                   // Contador para a quantidade de dados lidos
+    int blocknum = offset / Disk::DISK_BLOCK_SIZE;  // Número do bloco inicial
+    int blockoff = offset % Disk::DISK_BLOCK_SIZE;  // Offset dentro do bloco inicial
     union fs_block block;
 
     while (read < length) {
         // Leitura a partir dos ponteiros diretos
         if (blocknum < POINTERS_PER_INODE) {
-            if (inode.direct[blocknum] == 0) { // Nenhum bloco alocado
+            if (inode.direct[blocknum] == 0) {  // Nenhum bloco alocado
                 break;
             }
-            disk->read(inode.direct[blocknum], block.data); // Lê o bloco direto
+            disk->read(inode.direct[blocknum], block.data);  // Lê o bloco direto
         }
         // Leitura a partir dos ponteiros indiretos
         else {
-            if (inode.indirect == 0) { // Nenhum bloco indireto alocado
+            if (inode.indirect == 0) {  // Nenhum bloco indireto alocado
                 break;
             }
-            disk->read(inode.indirect, block.data); // Lê o bloco indireto
-            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) { // Nenhum bloco de dados alocado
+            disk->read(inode.indirect, block.data);                    // Lê o bloco indireto
+            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) {  // Nenhum bloco de dados alocado
                 break;
             }
-            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data); // Lê o bloco de dados
+            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data);  // Lê o bloco de dados
         }
 
         // Calcula quanto deve ser lido do bloco atual (ou o que falta ler, ou o que cabe no bloco)
@@ -247,17 +249,22 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
 
         // Atualiza os contadores
         read += toread;
-        blockoff = 0; // Somente o primeiro bloco pode ter offset
+        blockoff = 0;  // Somente o primeiro bloco pode ter offset
         blocknum++;
     }
 
-    return read; // Retorna o número de bytes lidos
+    return read;  // Retorna o número de bytes lidos
 }
 
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) {
     fs_inode inode;
 
-    if (inode_load(inumber, inode) == 0 || offset > inode.size) {
+    if (!mounted) {
+        cout << "Mount before file operations!" << endl;
+        return 0;
+    }
+
+    if (inode_load(inumber, inode) == 0 || offset > inode.size || inode.isvalid == 0) {
         return 0;
     }
 
@@ -354,7 +361,7 @@ int INE5412_FS::inode_load(int inumber, fs_inode &inode) {
     disk->read(blocknum, block.data);
 
     // Copia o inode solicitado para a variável fornecida
-    inode = block.inodes[inode_index];
+    inode = block.inode[inode_index];
 
     return 1;  // Sucesso
 }
@@ -390,11 +397,18 @@ int INE5412_FS::inode_save(int inumber, fs_inode &inode) {
 }
 
 int INE5412_FS::find_free_block() {
-    for (int i = 1; i < disk->size(); ++i) { // Começa de 1 para ignorar o bloco 0 (geralmente reservado)
-        if (free_blocks[i] == 0) { // Verifica se o bloco está livre
-            free_blocks[i] = 1; // Marca o bloco como ocupado
-            return i; // Retorna o índice do bloco livre
+    union fs_block block;
+
+    disk->read(0, block.data);
+
+    // Salvar o superbloco para extrair informações dele
+    int ninodeblocks = block.super.ninodeblocks;
+
+    for (int i = ninodeblocks + 1; i < disk->size(); ++i) {  // Começa de 1 para ignorar o bloco 0 (geralmente reservado)
+        if (free_blocks[i] == 0) {                           // Verifica se o bloco está livre
+            free_blocks[i] = 1;                              // Marca o bloco como ocupado
+            return i;                                        // Retorna o índice do bloco livre
         }
     }
-    return -1; // Sem blocos livres
+    return -1;  // Sem blocos livres
 }
