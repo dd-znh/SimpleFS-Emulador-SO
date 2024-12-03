@@ -1,6 +1,7 @@
 #include "fs.h"
 
 int INE5412_FS::fs_format() {
+
     // Lê o bloco 0 para verificar se o disco já está formatado
     union fs_block block;
     disk->read(0, block.data);
@@ -28,8 +29,8 @@ int INE5412_FS::fs_format() {
 
     // Apagar tabelas de inodes
     for (int i = 1; i <= new_block_zero.super.ninodes; i++) {
-        inode_load(i, inode);
-        inode.isvalid = 0;
+        inode_load(i, inode); 
+        inode.isvalid = 0;  
         inode_save(i, inode);
     }
 
@@ -37,6 +38,7 @@ int INE5412_FS::fs_format() {
 }
 
 void INE5412_FS::fs_debug() {
+
     // Lê o superbloco
     union fs_block block;
     disk->read(0, block.data);
@@ -53,6 +55,7 @@ void INE5412_FS::fs_debug() {
 
     // Iterar sobre todos os inodes
     for (int i = 1; i <= superblock.ninodes; i++) {
+
         // Carrega o inode
         inode_load(i, inode);
 
@@ -88,6 +91,7 @@ void INE5412_FS::fs_debug() {
 }
 
 int INE5412_FS::fs_mount() {
+
     // Lê o superbloco
     union fs_block block;
     disk->read(0, block.data);
@@ -126,12 +130,12 @@ int INE5412_FS::fs_mount() {
             }
         }
     }
-    mounted = true;
 
     return 1;
 }
 
 int INE5412_FS::fs_create() {
+
     // Carrega o superbloco
     fs_inode inode;
     union fs_block block;
@@ -153,13 +157,9 @@ int INE5412_FS::fs_create() {
     return 0;
 }
 
+
 int INE5412_FS::fs_delete(int inumber) {
     fs_inode inode;
-
-    if (!mounted) {
-        cout << "Mount before file operations!" << endl;
-        return 0;
-    }
 
     // Carrega o inode e retorna 0 se o número do inode for inválido
     if (inode_load(inumber, inode) && inode.isvalid) {
@@ -190,12 +190,14 @@ int INE5412_FS::fs_delete(int inumber) {
     return 0;
 }
 
+
 int INE5412_FS::fs_getsize(int inumber) {
+    
     // Carrega o inode e retorna -1 se o número do inode for inválido
-    fs_inode inode;
-    if (inode_load(inumber, inode) == 1) {
-        return inode.size;
-    }
+	fs_inode inode;
+	if (inode_load(inumber, inode) == 1) {
+		return inode.size;
+	}
     return -1;
 }
 
@@ -208,37 +210,33 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
     }
     // Retorna 0 se o offset for maior ou igual ao tamanho do arquivo
     if (offset >= inode.size) {
-        // cout << "offset >= inode.size\n";
+        cout << "offset >= inode.size\n";
         return 0;
     }
 
-    if (offset + length > inode.size) {
-        length = inode.size - offset;
-    }
-
-    int read = 0;                                   // Contador para a quantidade de dados lidos
-    int blocknum = offset / Disk::DISK_BLOCK_SIZE;  // Número do bloco inicial
-    int blockoff = offset % Disk::DISK_BLOCK_SIZE;  // Offset dentro do bloco inicial
+    int read = 0; // Contador para a quantidade de dados lidos
+    int blocknum = offset / Disk::DISK_BLOCK_SIZE; // Número do bloco inicial
+    int blockoff = offset % Disk::DISK_BLOCK_SIZE; // Offset dentro do bloco inicial
     union fs_block block;
 
     while (read < length) {
         // Leitura a partir dos ponteiros diretos
         if (blocknum < POINTERS_PER_INODE) {
-            if (inode.direct[blocknum] == 0) {  // Nenhum bloco alocado
+            if (inode.direct[blocknum] == 0) { // Nenhum bloco alocado
                 break;
             }
-            disk->read(inode.direct[blocknum], block.data);  // Lê o bloco direto
+            disk->read(inode.direct[blocknum], block.data); // Lê o bloco direto
         }
         // Leitura a partir dos ponteiros indiretos
         else {
-            if (inode.indirect == 0) {  // Nenhum bloco indireto alocado
+            if (inode.indirect == 0) { // Nenhum bloco indireto alocado
                 break;
             }
-            disk->read(inode.indirect, block.data);                    // Lê o bloco indireto
-            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) {  // Nenhum bloco de dados alocado
+            disk->read(inode.indirect, block.data); // Lê o bloco indireto
+            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) { // Nenhum bloco de dados alocado
                 break;
             }
-            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data);  // Lê o bloco de dados
+            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data); // Lê o bloco de dados
         }
 
         // Calcula quanto deve ser lido do bloco atual (ou o que falta ler, ou o que cabe no bloco)
@@ -249,22 +247,17 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
 
         // Atualiza os contadores
         read += toread;
-        blockoff = 0;  // Somente o primeiro bloco pode ter offset
+        blockoff = 0; // Somente o primeiro bloco pode ter offset
         blocknum++;
     }
 
-    return read;  // Retorna o número de bytes lidos
+    return read; // Retorna o número de bytes lidos
 }
 
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) {
     fs_inode inode;
 
-    if (!mounted) {
-        cout << "Mount before file operations!" << endl;
-        return 0;
-    }
-
-    if (inode_load(inumber, inode) == 0 || offset > inode.size || inode.isvalid == 0) {
+    if (inode_load(inumber, inode) == 0 || offset > inode.size) {
         return 0;
     }
 
@@ -272,9 +265,12 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
     int blocknum = offset / Disk::DISK_BLOCK_SIZE;
     int blockoff = offset % Disk::DISK_BLOCK_SIZE;
     union fs_block block;
+    union fs_block indirect_block;
 
     while (written < length) {
         int towrite = std::min(length - written, Disk::DISK_BLOCK_SIZE - blockoff);
+
+        cout << POINTERS_PER_BLOCK << " " << POINTERS_PER_INODE << " " << blocknum << " " << blockoff << " " << towrite << "\n";
 
         if (blocknum < POINTERS_PER_INODE) {
             if (inode.direct[blocknum] == 0) {
@@ -289,11 +285,13 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
             disk->read(inode.direct[blocknum], block.data);
         } else {
             int indirect_index = blocknum - POINTERS_PER_INODE;
+            cout << POINTERS_PER_INODE << " " << blocknum << " " << indirect_index << "\n";
             if (indirect_index >= POINTERS_PER_BLOCK) {
                 cout << "Error: File exceeds maximum size\n";
                 break;
             }
             if (inode.indirect == 0) {
+                cout << "Creating indirect pointer\n";
                 int free_block = find_free_block();
                 if (free_block == -1) {
                     cout << "Error: No free blocks available for indirect pointer\n";
@@ -301,29 +299,36 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
                 }
                 inode.indirect = free_block;
                 free_blocks[free_block] = 1;
-                std::fill(std::begin(block.pointers), std::end(block.pointers), 0);
-                disk->write(inode.indirect, block.data);
+                std::fill(std::begin(indirect_block.pointers), std::end(indirect_block.pointers), 0);
+                disk->write(inode.indirect, indirect_block.data);
             }
-            disk->read(inode.indirect, block.data);
-            if (block.pointers[indirect_index] == 0) {
+            disk->read(inode.indirect, indirect_block.data);
+            if (indirect_block.pointers[indirect_index] == 0) {
                 int free_block = find_free_block();
                 if (free_block == -1) {
                     cout << "Error: No free blocks available\n";
                     return written;
                 }
-                block.pointers[indirect_index] = free_block;
+                indirect_block.pointers[indirect_index] = free_block;
                 free_blocks[free_block] = 1;
-                disk->write(inode.indirect, block.data);
+                disk->write(inode.indirect, indirect_block.data);
             }
-            disk->read(block.pointers[indirect_index], block.data);
+            cout << "Reading indirect block\n";
+            for (int i = 0; i < POINTERS_PER_BLOCK; i++) {
+                cout << indirect_block.pointers[i] << " ";
+            }
+            cout << indirect_block.pointers[indirect_index] << "\n";
+            disk->read(indirect_block.pointers[indirect_index], block.data);
         }
 
         std::copy(data + written, data + written + towrite, block.data + blockoff);
 
         if (blocknum < POINTERS_PER_INODE) {
+            cout << "Writing block 1" << inode.direct[blocknum] << "\n";
             disk->write(inode.direct[blocknum], block.data);
         } else {
-            disk->write(block.pointers[blocknum - POINTERS_PER_INODE], block.data);
+            cout << "Writing block 2" << block.pointers[blocknum - POINTERS_PER_INODE] << "\n";
+            disk->write(indirect_block.pointers[blocknum - POINTERS_PER_INODE], block.data);
         }
 
         written += towrite;
