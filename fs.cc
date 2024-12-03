@@ -1,7 +1,6 @@
 #include "fs.h"
 
 int INE5412_FS::fs_format() {
-
     // Lê o bloco 0 para verificar se o disco já está formatado
     union fs_block block;
     disk->read(0, block.data);
@@ -29,69 +28,71 @@ int INE5412_FS::fs_format() {
 
     // Apagar tabelas de inodes
     for (int i = 1; i <= new_block_zero.super.ninodes; i++) {
-        inode_load(i, inode); 
-        inode.isvalid = 0;  
+        inode_load(i, inode);
+        inode.isvalid = 0;
         inode_save(i, inode);
     }
 
     return 1;
 }
 
-void INE5412_FS::fs_debug() {
-
+stringstream INE5412_FS::fs_debug() {
     // Lê o superbloco
     union fs_block block;
     disk->read(0, block.data);
     fs_superblock superblock = block.super;
 
+    stringstream result;
+
     // Imprime informações do superbloco
-    cout << "superblock:\n";
-    cout << "    " << (superblock.magic == FS_MAGIC ? "magic number is valid\n" : "magic number is invalid!\n");
-    cout << "    " << superblock.nblocks << " blocks on disk\n";
-    cout << "    " << superblock.ninodeblocks << " blocks for inodes\n";
-    cout << "    " << superblock.ninodes << " inodes total\n";
+    result << "superblock:\n";
+    result << "    " << (superblock.magic == FS_MAGIC ? "magic number is valid\n" : "magic number is invalid!\n");
+    result << "    " << superblock.nblocks << " blocks on disk\n";
+    result << "    " << superblock.ninodeblocks << " blocks for inodes\n";
+    result << "    " << superblock.ninodes << " inodes total\n";
 
     fs_inode inode;
 
     // Iterar sobre todos os inodes
     for (int i = 1; i <= superblock.ninodes; i++) {
-
         // Carrega o inode
         inode_load(i, inode);
 
         // Imprime informações do inode
         if (inode.isvalid != 0) {
-            cout << "inode " << i << ":\n";
-            cout << "    size: " << inode.size << " bytes\n";
-            cout << "    direct blocks:";
+            result << "inode " << i << ":\n";
+            result << "    size: " << inode.size << " bytes\n";
+            result << "    direct blocks:";
 
             // Imprime os ponteiros diretos
             for (int j = 0; j < POINTERS_PER_INODE; j++) {
                 if (inode.direct[j] != 0) {
-                    cout << " " << inode.direct[j];
+                    result << " " << inode.direct[j];
                 }
             }
 
-            cout << "\n";
+            result << "\n";
 
             // Imprime os ponteiros indiretos
             if (inode.indirect != 0) {
-                cout << "    indirect block: " << inode.indirect << "\n";
+                result << "    indirect block: " << inode.indirect << "\n";
                 disk->read(inode.indirect, block.data);
-                cout << "    indirect data blocks:";
+                result << "    indirect data blocks:";
                 for (int j = 0; j < POINTERS_PER_BLOCK; j++) {
                     if (block.pointers[j] != 0) {
-                        cout << " " << block.pointers[j];
+                        result << " " << block.pointers[j];
                     }
                 }
-                cout << "\n";
+                result << "\n";
             }
         }
     }
+
+    cout << result.str();
+    return result;
 }
 
 int INE5412_FS::fs_mount() {
-
     // Lê o superbloco
     union fs_block block;
     disk->read(0, block.data);
@@ -131,11 +132,12 @@ int INE5412_FS::fs_mount() {
         }
     }
 
+    mounted = true;
+
     return 1;
 }
 
 int INE5412_FS::fs_create() {
-
     // Carrega o superbloco
     fs_inode inode;
     union fs_block block;
@@ -157,9 +159,12 @@ int INE5412_FS::fs_create() {
     return 0;
 }
 
-
 int INE5412_FS::fs_delete(int inumber) {
     fs_inode inode;
+    if (!mounted) {
+        cout << "Mount before disk operations\n";
+        return 0;
+    }
 
     // Carrega o inode e retorna 0 se o número do inode for inválido
     if (inode_load(inumber, inode) && inode.isvalid) {
@@ -190,14 +195,12 @@ int INE5412_FS::fs_delete(int inumber) {
     return 0;
 }
 
-
 int INE5412_FS::fs_getsize(int inumber) {
-    
     // Carrega o inode e retorna -1 se o número do inode for inválido
-	fs_inode inode;
-	if (inode_load(inumber, inode) == 1) {
-		return inode.size;
-	}
+    fs_inode inode;
+    if (inode_load(inumber, inode) == 1) {
+        return inode.size;
+    }
     return -1;
 }
 
@@ -214,29 +217,29 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
         return 0;
     }
 
-    int read = 0; // Contador para a quantidade de dados lidos
-    int blocknum = offset / Disk::DISK_BLOCK_SIZE; // Número do bloco inicial
-    int blockoff = offset % Disk::DISK_BLOCK_SIZE; // Offset dentro do bloco inicial
+    int read = 0;                                   // Contador para a quantidade de dados lidos
+    int blocknum = offset / Disk::DISK_BLOCK_SIZE;  // Número do bloco inicial
+    int blockoff = offset % Disk::DISK_BLOCK_SIZE;  // Offset dentro do bloco inicial
     union fs_block block;
 
     while (read < length) {
         // Leitura a partir dos ponteiros diretos
         if (blocknum < POINTERS_PER_INODE) {
-            if (inode.direct[blocknum] == 0) { // Nenhum bloco alocado
+            if (inode.direct[blocknum] == 0) {  // Nenhum bloco alocado
                 break;
             }
-            disk->read(inode.direct[blocknum], block.data); // Lê o bloco direto
+            disk->read(inode.direct[blocknum], block.data);  // Lê o bloco direto
         }
         // Leitura a partir dos ponteiros indiretos
         else {
-            if (inode.indirect == 0) { // Nenhum bloco indireto alocado
+            if (inode.indirect == 0) {  // Nenhum bloco indireto alocado
                 break;
             }
-            disk->read(inode.indirect, block.data); // Lê o bloco indireto
-            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) { // Nenhum bloco de dados alocado
+            disk->read(inode.indirect, block.data);                    // Lê o bloco indireto
+            if (block.pointers[blocknum - POINTERS_PER_INODE] == 0) {  // Nenhum bloco de dados alocado
                 break;
             }
-            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data); // Lê o bloco de dados
+            disk->read(block.pointers[blocknum - POINTERS_PER_INODE], block.data);  // Lê o bloco de dados
         }
 
         // Calcula quanto deve ser lido do bloco atual (ou o que falta ler, ou o que cabe no bloco)
@@ -247,15 +250,20 @@ int INE5412_FS::fs_read(int inumber, char *data, int length, int offset) {
 
         // Atualiza os contadores
         read += toread;
-        blockoff = 0; // Somente o primeiro bloco pode ter offset
+        blockoff = 0;  // Somente o primeiro bloco pode ter offset
         blocknum++;
     }
 
-    return read; // Retorna o número de bytes lidos
+    return read;  // Retorna o número de bytes lidos
 }
 
 int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) {
     fs_inode inode;
+
+    if (!mounted) {
+        cout << "Mount before disk operations\n";
+        return 0;
+    }
 
     if (inode_load(inumber, inode) == 0 || offset > inode.size) {
         return 0;
