@@ -1,27 +1,35 @@
-GXX=g++
-CXXFLAGS = -std=c++17
+# Variáveis
+CXX = g++
+CXXFLAGS = -Wall -g
 LDFLAGS = -lsfml-graphics -lsfml-window -lsfml-system
 
-interface: gui.o fs.o disk.o fileops.o
-	$(GXX) $(CXXFLAGS) $(LDFLAGS) gui.o fs.o disk.o fileops.o -o interface
+# Nomes dos executáveis
+TARGET_SHELL = simplefs
+TARGET_GUI = simplefs_gui
 
-gui.o: gui.cc gui.h
-	$(GXX) -Wall gui.cc -c -o gui.o -g
+# Objetos necessários
+OBJECTS_SHELL = shell.o fs.o disk.o
+OBJECTS_GUI = gui.o fs.o disk.o fileops.o
 
-simplefs: shell.o fs.o disk.o
-	$(GXX) shell.o fs.o disk.o -o simplefs
+# Regras principais
+.PHONY: all gui clean
 
-fileops.o: fileops.cc fileops.h
-	$(GXX) -Wall fileops.cc -c -o fileops.o -g
+all: $(TARGET_SHELL)
 
-shell.o: shell.cc
-	$(GXX) -Wall shell.cc -c -o shell.o -g
+gui: $(TARGET_GUI)
 
-fs.o: fs.cc fs.h
-	$(GXX) -Wall fs.cc -c -o fs.o -g
+# Alvo para o shell
+$(TARGET_SHELL): $(OBJECTS_SHELL)
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
-disk.o: disk.cc disk.h
-	$(GXX) -Wall disk.cc -c -o disk.o -g
+# Alvo para o GUI
+$(TARGET_GUI): $(OBJECTS_GUI)
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
+# Regra genérica para compilação de objetos
+%.o: %.cc
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Limpeza
 clean:
-	rm simplefs disk.o fs.o shell.o interface gui.o fileops.o
+	rm -f *.o $(TARGET_SHELL) $(TARGET_GUI)

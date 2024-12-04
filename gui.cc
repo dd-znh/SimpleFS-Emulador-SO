@@ -1,5 +1,4 @@
 #include "gui.h"
-
 #include "disk.h"
 #include "fileops.h"
 
@@ -10,7 +9,8 @@ GraphicApp::GraphicApp(INE5412_FS *fs, char *filename) : window(sf::VideoMode(90
                                                          keyLabels({"7", "8", "9", "4", "5", "6", "1", "2", "3", "0", "<"}) {
     window.setFramerateLimit(60);
 
-    if (!font.loadFromFile("/System/Library/Fonts/Supplemental/Arial.ttf")) {
+    // Tente carregar uma fonte mais comum no Linux
+    if (!font.loadFromFile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")) {
         throw std::runtime_error("Failed to load font!");
     }
 
@@ -65,7 +65,7 @@ void GraphicApp::createKeyboard() {
 
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
-            if (i * cols + j >= keyLabels.size()) break;
+            if (static_cast<std::vector<std::string>::size_type>(i * cols + j) >= keyLabels.size()) break;
 
             sf::RectangleShape key(sf::Vector2f(keyWidth, keyHeight));
             key.setPosition(640 + j * (keyWidth + 10), 60 + i * (keyHeight + 10));
@@ -156,7 +156,7 @@ void GraphicApp::run() {
     float textPositionY = 40.f;                 // Posição inicial Y do texto
 
     // View para rolar o texto
-    sf::View textView = window.getView();  // Usaremos o mesmo view da janela, mas ajustado
+    // sf::View textView = window.getView();  // Usaremos o mesmo view da janela, mas ajustado
 
     while (window.isOpen()) {
         sf::Event event;
