@@ -287,7 +287,8 @@ int INE5412_FS::fs_write(int inumber, const char *data, int length, int offset) 
                 free_blocks[free_block] = 1;
             }
             disk->read(inode.direct[blocknum], block.data);
-        } else {
+        } 
+        else {
             int indirect_index = blocknum - POINTERS_PER_INODE;
             if (indirect_index >= POINTERS_PER_BLOCK) {
                 cout << "Error: File exceeds maximum size\n";
